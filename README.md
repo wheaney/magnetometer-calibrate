@@ -1,8 +1,8 @@
 # magnetometer-calibrate
 
-This library provides a C API for collecting raw magnetometer samples and generating hard iron offset and soft iron matrix calibrations using Qingde Li and John G.Griffiths's Ellipsoid Fitting algorithm. Requires the [GSL](https://www.gnu.org/software/gsl/) library.
+This library provides a C API for collecting raw magnetometer samples and generating hard iron offset and soft iron matrix calibrations using Qingde Li and John G. Griffiths's Ellipsoid Fitting algorithm. Requires the [GSL](https://www.gnu.org/software/gsl/) library.
 
-## Relevant Linkks
+## Relevant Links
 
 * [Least Squares Ellipsoid Specific Fitting](https://www.researchgate.net/profile/Qingde-Li/publication/4070857_Least_squares_ellipsoid_specific_fitting/links/565c4e3e08aefe619b252553/Least-squares-ellipsoid-specific-fitting.pdf) original publication
 * [MATLAB demonstration](https://www.mathworks.com/matlabcentral/fileexchange/23377-ellipsoid-fitting) files
