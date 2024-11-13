@@ -7,9 +7,6 @@ set(CMAKE_BUILD_TYPE Debug)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBGSL REQUIRED gsl)
 
-add_subdirectory(modules/hidapi)
-add_subdirectory(modules/Fusion/Fusion)
-
 add_library(
 		magnetometerCalibration
 		src/magnet.c

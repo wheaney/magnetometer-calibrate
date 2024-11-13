@@ -361,7 +361,6 @@ void compute_magnet_calibration(double **hard_iron, double **soft_iron) {
     gsl_matrix_free(Q_inv);
     gsl_matrix_free(Dz);
     gsl_matrix_free(SQ);
-    gsl_matrix_free(A);
     gsl_vector_free(v);
     gsl_matrix_free(S);
 
