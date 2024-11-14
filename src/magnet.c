@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -15,11 +16,17 @@ static double S_accum[10][10] = {0};  // Accumulated S matrix
 static int sample_count = 0;
 
 // Function to accumulate magnetometer samples
-void collect_magnet(double x, double y, double z) {
+void collect_magnet(double x, double y, double z, uint32_t timestamp_ms) {
 #ifndef NDEBUG
-    // extract for use with a program like Magneto, for example: 
-    //      grep "Mag sample: " log_file.txt | awk -F'\t' '{print $2, $3, $4}' > mag.txt
-    printf("Mag sample: %f\t%f\t%f\n", x, y, z);
+    static int last_sample_ms = 0;
+
+    if (last_sample_ms != 0) {
+        int delta_ms = timestamp_ms - last_sample_ms;
+        // extract for use with a program like Magneto, for example: 
+        //      grep "Mag sample:" log_file.txt | awk -F'\t' '{print $2 "\t" $3 "\t" $4}' > mag.txt
+        printf("Mag sample:\t%f\t%f\t%f\t%d\n", x, y, z, delta_ms);
+    }
+    last_sample_ms = timestamp_ms;
 #endif
 
     double D[10];
@@ -390,23 +397,70 @@ void reset_magnet_calibration() {
 
 // Projects the calibrated magnet reading onto the horizontal plane, using gravity as a reference.
 // Useful for getting an accurate heading.
-void magnet_align_with_gravity(double mag[3], double accel[3], double mag_result[3]) {
-    // Normalize the accelerometer vector to get the gravity unit vector
-    double norm_accel = sqrtf(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
-    if (norm_accel == 0.0f) {
-        mag_result[0] = mag[0];
-        mag_result[1] = mag[1];
-        mag_result[2] = mag[2];
-        return;
+void magnet_align_with_gravity(double magnet[3], double accel[3], double result[3]) {
+    // Normalize accel
+    double mag_accel = sqrt(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
+    double u_accel[3] = { accel[0]/mag_accel, accel[1]/mag_accel, accel[2]/mag_accel };
+
+    // Reference vector [0, 0, 1]
+    double ref[3] = { 0.0, 0.0, 1.0 };
+
+    // Compute dot product
+    double dot = u_accel[0]*ref[0] + u_accel[1]*ref[1] + u_accel[2]*ref[2];
+    if (dot > 1.0) dot = 1.0;
+    if (dot < -1.0) dot = -1.0;
+
+    // Compute angle
+    double angle = acos(dot);
+
+    // Compute rotation axis (cross product)
+    double axis[3] = {
+        u_accel[1]*ref[2] - u_accel[2]*ref[1],
+        u_accel[2]*ref[0] - u_accel[0]*ref[2],
+        u_accel[0]*ref[1] - u_accel[1]*ref[0]
+    };
+
+    // Compute magnitude of axis
+    double mag_axis = sqrt(axis[0]*axis[0] + axis[1]*axis[1] + axis[2]*axis[2]);
+
+    if (mag_axis < 1e-8) {
+        // Axis is zero vector (vectors are parallel or anti-parallel)
+        if (dot > 0.9999) {
+            // Vectors are aligned, no rotation needed
+            result[0] = magnet[0];
+            result[1] = magnet[1];
+            result[2] = magnet[2];
+            return;
+        } else {
+            // Vectors are opposite, rotate 180 degrees around arbitrary axis
+            axis[0] = 1.0;
+            axis[1] = 0.0;
+            axis[2] = 0.0;
+            mag_axis = 1.0;
+            angle = M_PI;
+        }
     }
 
-    float gravity_unit[3] = { accel[0]/norm_accel, accel[1]/norm_accel, accel[2]/norm_accel };
+    // Normalize rotation axis
+    double u_axis[3] = { axis[0]/mag_axis, axis[1]/mag_axis, axis[2]/mag_axis };
 
-    // Compute dot product of magnetometer vector and gravity unit vector
-    float dot_product = mag[0]*gravity_unit[0] + mag[1]*gravity_unit[1] + mag[2]*gravity_unit[2];
+    // Compute Rodrigues' rotation formula components
+    double cos_angle = cos(angle);
+    double sin_angle = sin(angle);
+    double one_minus_cos = 1.0 - cos_angle;
 
-    // Project the magnetometer vector onto the plane perpendicular to gravity
-    mag_result[0] = mag[0] - dot_product * gravity_unit[0];
-    mag_result[1] = mag[1] - dot_product * gravity_unit[1];
-    mag_result[2] = mag[2] - dot_product * gravity_unit[2];
+    // Compute k x magnet (cross product)
+    double k_cross_magnet[3] = {
+        u_axis[1]*magnet[2] - u_axis[2]*magnet[1],
+        u_axis[2]*magnet[0] - u_axis[0]*magnet[2],
+        u_axis[0]*magnet[1] - u_axis[1]*magnet[0]
+    };
+
+    // Compute k ⋅ magnet (dot product)
+    double k_dot_magnet = u_axis[0]*magnet[0] + u_axis[1]*magnet[1] + u_axis[2]*magnet[2];
+
+    // Compute rotated vector
+    result[0] = magnet[0]*cos_angle + k_cross_magnet[0]*sin_angle + u_axis[0]*k_dot_magnet*one_minus_cos;
+    result[1] = magnet[1]*cos_angle + k_cross_magnet[1]*sin_angle + u_axis[1]*k_dot_magnet*one_minus_cos;
+    result[2] = magnet[2]*cos_angle + k_cross_magnet[2]*sin_angle + u_axis[2]*k_dot_magnet*one_minus_cos;
 }
