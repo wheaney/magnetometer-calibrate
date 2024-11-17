@@ -240,7 +240,7 @@ static void FindFit4(gsl_matrix *S, gsl_vector *v) {
 }
 
 // Function to generate calibration parameters based on current snapshot of magnetometer samples
-void compute_magnet_calibration(double **hard_iron, double **soft_iron) {
+void compute_magnet_calibration(double (*hard_iron)[3], double (*soft_iron)[9]) {
     gsl_matrix *S = gsl_matrix_calloc(10, 10);
     gsl_vector *v = gsl_vector_calloc(10);
     
@@ -292,14 +292,6 @@ void compute_magnet_calibration(double **hard_iron, double **soft_iron) {
     // Calculate combined bias: B = -B
     gsl_vector_scale(B, -1.0);
 
-#ifndef NDEBUG
-    printf("Combined bias:\n");
-    int i;
-    for (i = 0; i < 3; i++) {
-        printf("\tB[%d] = %g\n", i, gsl_vector_get(B, i));
-    }
-#endif
-
     // Calculate btqb = B^T * Q * B
     gsl_vector *temp_vec = gsl_vector_alloc(3);
     gsl_blas_dgemv(CblasNoTrans, 1.0, Q, B, 0.0, temp_vec);
@@ -322,6 +314,7 @@ void compute_magnet_calibration(double **hard_iron, double **soft_iron) {
     gsl_eigen_symmv_free(w);
 
     // Normalize eigenvectors
+    int i;
     for (i = 0; i < 3; i++) {
         gsl_vector_view vec_i = gsl_matrix_column(evec, i);
         double norm = gsl_blas_dnrm2(&vec_i.vector);
@@ -352,11 +345,9 @@ void compute_magnet_calibration(double **hard_iron, double **soft_iron) {
 
     gsl_matrix *A = SQ;
 
-    *hard_iron = (double *)malloc(3 * sizeof(double));
     gsl_vector_view hard_iron_view = gsl_vector_view_array(*hard_iron, 3);
     gsl_vector_memcpy(&hard_iron_view.vector, B);
-
-    *soft_iron = (double *)malloc(9 * sizeof(double));
+    
     gsl_matrix_view soft_iron_view = gsl_matrix_view_array(*soft_iron, 3, 3);
     gsl_matrix_memcpy(&soft_iron_view.matrix, A);
 

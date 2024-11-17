@@ -5,7 +5,7 @@
 
 void collect_magnet(double x, double y, double z, uint32_t timestamp_ms);
 
-void compute_magnet_calibration(double **hard_iron, double **soft_iron);
+void compute_magnet_calibration(double (*hard_iron)[3], double (*soft_iron)[9]);
 
 void reset_magnet_calibration();
 
